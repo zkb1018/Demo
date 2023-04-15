@@ -7,10 +7,12 @@
 
 #include "Blackjack.hpp"
 #include<iostream>
+#include<stdlib.h>
 #include<cstdlib>
 #include<algorithm>
 #include<random>
 #include <iomanip>
+#include<unistd.h>
 using namespace std;
 enum Suit{Clubs,Hearts,Spades,Diamonds};
 string Values[]={"2","3","4","5","6","7","8","9","10","J","Q","K","A"};
@@ -97,7 +99,9 @@ public:
         mt19937 rng(rd());
         std::shuffle(this->cards.begin(),this->cards.end(),rng);
     }
-    
+    void pokerDestroy(){
+        vector<Card>().swap(this->cards);
+    }
 };
 
 
@@ -116,9 +120,8 @@ public:
     void hit(Card card){//拿牌
         this->cards.push_back(card);
     }
-    void stand(){
-        //停止要牌
-        
+    void backCard(){
+        vector<Card>().swap(cards);
     }
    
 };
@@ -129,25 +132,69 @@ public:
             this->cards[0].setVisible(false);
         }
     }
+    void showFirstCard(){
+        if(this->cards.size()!=0){
+            this->cards[0].setVisible(true);
+        }
+    }
 };
 class Game{
 private:
     int turn;//1:玩家  0:庄家
-    bool isGameOver;
+    bool isGameOver=false;
+    int playerPoint;
+    int dealerPoint;
+    int rounds=0;
     Poker poker;
     Player player;
     Dealer dealer;
 public:
-    void gameStart(){
+    void initData(){
+        isGameOver=false;
+        playerPoint=0;
+        dealerPoint=0;
+        player.backCard();
+        dealer.backCard();
+        poker.pokerDestroy();
         poker.initPoker();
         poker.shuffle();
+        turn=1;
+    }
+    void gameStart(){
+        while(!isGameOver){
+            oneRound();
+        }
+    }
+    void oneRound(){//一轮游戏
+        if(rounds==0){
+            cout<<"Welcome to BlackJack.Press any key to start:"<<endl;
+            cin.get();
+            gameProcess();
+        }
+        else{
+            cout<<"Do you want to continue?(y/n):"<<endl;
+            char c;
+            cin>>c;
+            if(c=='y'){
+                system("clear");//清屏
+                gameProcess();
+            }
+            else{
+                isGameOver=true;
+            }
+        }
+       
+    }
+    void gameProcess(){
+        initData();
         dealFirstTwoCard();
         show();
-        this->turn=1;
         while(this->turn==1){
             askHitOrStand();
         }
-       
+        dealerTurn();
+        comparePoint();
+        rounds++;
     }
     void dealFirstTwoCard(){
         for(int i=0;i<4;i++){
@@ -166,7 +213,13 @@ public:
     }
     void calculate(){
         int sum[2]={0,0};
-        vector<Card> pc=this->player.getCards();
+        vector<Card> pc;
+        if(this->turn==1){
+            pc=this->player.getCards();
+        }
+        else{
+            pc=this->dealer.getCards();
+        }
         for(int i=0;i<pc.size()&&(sum[0]<=21||sum[1]<=21);i++){
             if(pc[i].getValue()!=-1){
                 sum[0]+=pc[i].getValue();
@@ -178,12 +231,35 @@ public:
             }
         }
         if(sum[0]==sum[1]){
-            cout<<"your total is:"<<sum[0]<<endl;
+            cout<<(this->turn==1?"your points is:":"dealer\'s points is:")<<sum[0]<<endl;
         }
         else{
-            cout<<"your total is:"<<sum[0]<<(sum[1]>21?"":"/"+to_string(sum[1]))<<endl;
+            cout<<(this->turn==1?"your points is:":"dealer\'s points is:")<<sum[0]<<(sum[1]>21?"":"/"+to_string(sum[1]))<<endl;
         }
        
+       
+        if(this->turn==1){
+            if(sum[1]<=21&&sum[0]<=21){
+                this->playerPoint=sum[1];
+            }
+            else if(sum[1]>21&&sum[0]<=21){
+                this->playerPoint=sum[0];
+            }
+            else if(sum[1]>21&&sum[0]>21){
+                this->playerPoint=0;
+            }
+        }
+        else{
+            if(sum[1]<=21&&sum[0]<=21){
+                this->dealerPoint=sum[1];
+            }
+            else if(sum[1]>21&&sum[0]<=21){
+                this->dealerPoint=sum[0];
+            }
+            else if(sum[1]>21&&sum[0]>21){
+                this->dealerPoint=0;
+            }
+        }
         if(sum[0]>21&&sum[1]>21){
             cout<<"Burst!!!"<<endl;
             this->turn=0;
@@ -192,6 +268,7 @@ public:
             cout<<"BlackJack!!!"<<endl;
             this->turn=0;
         }
+                    
     }
     void changeTurn(){
         this->turn=0;
@@ -221,6 +298,35 @@ public:
             cout<<"invalid input!"<<endl;
         }
       
+    }
+    void dealerTurn(){//庄家翻牌
+        sleep(1);
+        cout<<"Now to Dealer."<<endl;
+        sleep(2);
+        dealer.showFirstCard();
+        show();
+        calculate();
+        dealerMustHit();
+    }
+    void dealerMustHit(){
+        while(this->dealerPoint<17&&this->dealerPoint!=0){
+            sleep(3);
+            dealer.hit(poker.getTopCard());
+            poker.dealACard();
+            show();
+            calculate();
+        }
+    }
+    void comparePoint(){
+        if(this->playerPoint>this->dealerPoint){
+            cout<<"You win!!!"<<endl;
+        }
+        else if(this->playerPoint<this->dealerPoint||(this->playerPoint==0&&this->dealerPoint==0)){
+            cout<<"You lose!!!"<<endl;
+        }
+        else{
+            cout<<"Push"<<endl;
+        }
     }
 };
 int main(){
